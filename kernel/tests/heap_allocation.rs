@@ -1,27 +1,27 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(blog_os::test_runner)]
+#![test_runner(kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, vec::Vec};
-use blog_os::allocator::HEAP_SIZE;
-use bootloader::{entry_point, BootInfo};
+use bootloader_api::{entry_point, BootInfo};
 use core::panic::PanicInfo;
+use kernel::allocator::HEAP_SIZE;
 
 entry_point!(main);
 
-fn main(boot_info: &'static BootInfo) -> ! {
-    use blog_os::allocator;
-    use blog_os::memory::{self, BootInfoFrameAllocator};
+fn main(boot_info: &'static mut BootInfo) -> ! {
+    use kernel::allocator;
+    use kernel::memory::{self, BootInfoFrameAllocator};
     use x86_64::VirtAddr;
 
-    blog_os::init();
-    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
+    kernel::init();
+    let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset.into_option().unwrap());
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
+    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
     test_main();
@@ -66,5 +66,5 @@ fn many_boxes_long_lived() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    blog_os::test_panic_handler(info)
+    kernel::test_panic_handler(info)
 }
