@@ -11,6 +11,33 @@ fn main() {
     cmd.arg("-drive")
         .arg(format!("format=raw,file={bios_path}"));
 
+    let size_unit = "m";
+    let ram_size = 100;
+    let nvdimm_size = 1000;
+    let nvdimm_slots = 2;
+    let max_size = ram_size + nvdimm_size * nvdimm_slots;
+    cmd.arg("-m")
+        .arg(format!(
+            "{}{},slots={},maxmem={}{}",
+            ram_size,
+            size_unit,
+            1 + nvdimm_slots,
+            max_size,
+            size_unit
+        ))
+        .arg("-machine")
+        .arg("nvdimm=on");
+
+    for i in 1..=nvdimm_slots {
+        cmd.arg("-object")
+            .arg(format!(
+                "memory-backend-file,id=mem{},mem-path=pmem-{}.bin,share=on,size={}{}",
+                i, i, nvdimm_size, size_unit
+            ))
+            .arg("-device")
+            .arg(format!("nvdimm,id=nvdimm{},memdev=mem{},unarmed=off", i, i));
+    }
+
     let mut args = env::args();
     let first_arg = args.nth(1).unwrap_or_default().to_lowercase();
 

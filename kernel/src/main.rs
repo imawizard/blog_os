@@ -11,6 +11,8 @@ use core::panic::PanicInfo;
 use kernel::task::{executor::Executor, keyboard, Task};
 use kernel::{logger, println};
 
+use kernel::acpi;
+
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
@@ -27,6 +29,11 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+
+    let _acpi_tables = acpi::get_tables(
+        boot_info.rsdp_addr.into_option().expect("no rsdp set"),
+        phys_mem_offset,
+    );
 
     #[cfg(test)]
     test_main();
