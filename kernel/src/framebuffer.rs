@@ -43,6 +43,8 @@ fn get_char_raster(c: char) -> RasterizedChar {
     get(c).unwrap_or_else(|| get(BACKUP_CHAR).expect("Should get raster of backup char."))
 }
 
+const HEIGHT_PER_LINE: usize = font_constants::CHAR_RASTER_HEIGHT.val() + LINE_SPACING;
+
 /// Allows logging text to a pixel-based framebuffer.
 pub struct FrameBufferWriter {
     framebuffer: &'static mut [u8],
@@ -65,7 +67,7 @@ impl FrameBufferWriter {
     }
 
     fn newline(&mut self) {
-        self.y_pos += font_constants::CHAR_RASTER_HEIGHT.val() + LINE_SPACING;
+        self.y_pos += HEIGHT_PER_LINE;
         self.carriage_return()
     }
 
@@ -76,8 +78,20 @@ impl FrameBufferWriter {
     /// Erases all text on the screen. Resets `self.x_pos` and `self.y_pos`.
     pub fn clear(&mut self) {
         self.x_pos = BORDER_PADDING;
-        self.y_pos = BORDER_PADDING;
-        self.framebuffer.fill(0);
+        self.y_pos = self.height() - HEIGHT_PER_LINE - BORDER_PADDING; // start at bottom
+        self.framebuffer.fill(255);
+    }
+
+    fn scroll(&mut self) {
+        // Shift all bytes the number of bytes in one line to the left.
+        let offset_second_line = self.width() * self.info.bytes_per_pixel * HEIGHT_PER_LINE;
+        self.framebuffer.copy_within(offset_second_line.., 0);
+        self.y_pos -= HEIGHT_PER_LINE;
+
+        // Erase the current line.
+        let start = self.width() * self.info.bytes_per_pixel * self.y_pos;
+        let size = self.width() * self.info.bytes_per_pixel * HEIGHT_PER_LINE;
+        self.framebuffer[start..(start + size)].fill(255);
     }
 
     fn width(&self) -> usize {
@@ -102,7 +116,7 @@ impl FrameBufferWriter {
                 let new_ypos =
                     self.y_pos + font_constants::CHAR_RASTER_HEIGHT.val() + BORDER_PADDING;
                 if new_ypos >= self.height() {
-                    self.clear();
+                    self.scroll();
                 }
                 self.write_rendered_char(get_char_raster(c));
             }
@@ -122,10 +136,11 @@ impl FrameBufferWriter {
 
     fn write_pixel(&mut self, x: usize, y: usize, intensity: u8) {
         let pixel_offset = y * self.info.stride + x;
+        let v = 255 - intensity;
         let color = match self.info.pixel_format {
-            PixelFormat::Rgb => [intensity, intensity, intensity / 2, 0],
-            PixelFormat::Bgr => [intensity / 2, intensity, intensity, 0],
-            PixelFormat::U8 => [if intensity > 200 { 0xf } else { 0 }, 0, 0, 0],
+            PixelFormat::Rgb => [v, v, v, 0],
+            PixelFormat::Bgr => [v, v, v, 0],
+            PixelFormat::U8 => [if intensity > 200 { 0 } else { 0xf }; 4],
             other => {
                 // set a supported (but invalid) pixel format before panicking to avoid a double
                 // panic; it might not be readable though
