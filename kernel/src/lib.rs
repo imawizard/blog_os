@@ -16,6 +16,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod logger;
 pub mod memory;
+pub mod nfit;
 pub mod serial;
 pub mod task;
 

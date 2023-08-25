@@ -9,7 +9,11 @@ fn main() {
 
     let mut cmd = Command::new("qemu-system-x86_64");
     cmd.arg("-drive")
-        .arg(format!("format=raw,file={bios_path}"));
+        .arg(format!("format=raw,file={bios_path}"))
+        .arg("-no-reboot")
+        .arg("-no-shutdown")
+        .arg("-serial")
+        .arg("stdio");
 
     let size_unit = "m";
     let ram_size = 100;

@@ -11,7 +11,8 @@ use core::panic::PanicInfo;
 use kernel::task::{executor::Executor, keyboard, Task};
 use kernel::{logger, println};
 
-use kernel::acpi;
+use kernel::acpi::{self, sdt, AcpiError};
+use kernel::nfit;
 
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
@@ -30,10 +31,33 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
 
-    let _acpi_tables = acpi::get_tables(
+    let acpi_tables = acpi::get_tables(
         boot_info.rsdp_addr.into_option().expect("no rsdp set"),
         phys_mem_offset,
     );
+
+    let nfit = unsafe {
+        acpi_tables
+            .get_sdt::<nfit::Nfit>(sdt::Signature::NFIT)
+            .unwrap()
+            .ok_or(AcpiError::TableMissing(sdt::Signature::NFIT))
+            .unwrap()
+    };
+
+    for (i, e) in nfit.entries().enumerate() {
+        use kernel::println as p;
+        use nfit::NfitEntry as E;
+        match e {
+            E::SpaRange(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::NvdimmRegionMapping(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::Interleave(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::SmbiosManagementInfo(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::NvdimmControlRegion(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::NvdimmBlockDataWindowRegion(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::FlushHintAddress(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+            E::PlatformCapabilities(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
+        }
+    }
 
     #[cfg(test)]
     test_main();
