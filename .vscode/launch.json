@@ -1,0 +1,41 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Kernel (rust-gdb)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/kernel",
+      "cwd": "${workspaceRoot}",
+      "debugServerPath": "rust-gdb",
+      "MIMode": "gdb",
+      "miDebuggerServerAddress": ":1234",
+      "launchCompleteCommand": "exec-continue",
+      "externalConsole": true,
+      "stopAtEntry": true,
+      "setupCommands": [
+        { "text": "-enable-pretty-printing", "ignoreFailures": false },
+        { "text": "set arch i386:x86-64:intel" },
+        { "text": "add-symbol-file ${workspaceRoot}/target/debug/kernel -o 0x8000000000" },
+        { "text": "b kernel_main" },
+      ],
+      "preLaunchTask": "cargo run debug",
+    },
+    {
+      "name": "Kernel (lldb)",
+      "type": "lldb",
+      "request": "custom",
+      "breakpointMode": "file",
+      "targetCreateCommands": [
+        "target create --arch x86_64 ${workspaceRoot}/target/debug/kernel",
+        "target modules load --file ${workspaceRoot}/target/debug/kernel --slide 0x8000000000",
+      ],
+      "processCreateCommands": [
+        "gdb-remote localhost:1234",
+        "b kernel_main",
+        "c",
+      ],
+      "preLaunchTask": "cargo run debug",
+    },
+  ],
+}
