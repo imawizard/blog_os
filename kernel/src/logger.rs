@@ -46,7 +46,6 @@ pub fn init(framebuffer: &'static mut FrameBuffer) {
     let info = framebuffer.info();
     let logger = LOGGER.get_or_init(move || LockedLogger::new(framebuffer.buffer_mut(), info));
     log::set_logger(logger).expect("logger already set");
-    log::set_max_level(log::LevelFilter::Trace);
 }
 
 #[macro_export]

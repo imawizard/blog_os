@@ -15,9 +15,9 @@ fn main() {
         .arg("-serial")
         .arg("stdio");
 
-    let size_unit = "m";
-    let ram_size = 100;
-    let nvdimm_size = 1000;
+    let size_unit = "g";
+    let ram_size = 3;
+    let nvdimm_size = 1;
     let nvdimm_slots = 2;
     let max_size = ram_size + nvdimm_size * nvdimm_slots;
     cmd.arg("-m")

@@ -22,6 +22,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     use x86_64::VirtAddr;
 
     logger::init(boot_info.framebuffer.as_mut().expect("no framebuffer"));
+    log::set_max_level(log::LevelFilter::Trace);
     println!("Hello World{}", "!");
     kernel::init();
 
