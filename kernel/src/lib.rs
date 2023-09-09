@@ -17,6 +17,7 @@ pub mod interrupts;
 pub mod logger;
 pub mod memory;
 pub mod nfit;
+pub mod pmem;
 pub mod serial;
 pub mod task;
 pub mod vmem;

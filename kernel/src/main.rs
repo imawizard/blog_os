@@ -15,6 +15,7 @@ use bootloader_api::info::MemoryRegionKind;
 use core::ops::DerefMut;
 use kernel::acpi::{self, sdt, AcpiError};
 use kernel::nfit;
+use kernel::pmem;
 use kernel::vmem::{self, MappedRegions, UsableRegions};
 
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
@@ -104,6 +105,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     );
     vmem::MANAGER.lock().set(page_allocator).unwrap();
 
+    p!("============================");
+    p!("NFIT System Descriptor Table");
+    p!("============================");
+
     let acpi_tables = acpi::get_tables(
         boot_info.rsdp_addr.into_option().expect("no rsdp set"),
         phys_mem_offset,
@@ -129,6 +134,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             E::FlushHintAddress(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
             E::PlatformCapabilities(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),
         }
+    }
+
+    p!("==============");
+    p!("Mapped NVDIMMs");
+    p!("==============");
+
+    unsafe {
+        pmem::MANAGER.lock().init(&nfit);
     }
 
     #[cfg(test)]
