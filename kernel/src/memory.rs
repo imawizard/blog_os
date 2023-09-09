@@ -82,3 +82,47 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
         frame
     }
 }
+
+use bootloader_api::info::MemoryRegion;
+use core::ops::Range;
+use spin::Mutex;
+use x86_64::structures::paging::PageSize;
+
+pub static FRAMES: Mutex<SimpleFrameAllocator> = Mutex::new(SimpleFrameAllocator::new());
+
+#[derive(Debug)]
+pub struct SimpleFrameAllocator {
+    frames: Option<Range<PhysFrame>>,
+    allocated: u64,
+}
+
+impl SimpleFrameAllocator {
+    pub const fn new() -> Self {
+        SimpleFrameAllocator {
+            frames: None,
+            allocated: 0,
+        }
+    }
+
+    pub unsafe fn init(&mut self, usable: MemoryRegion) {
+        let first = PhysFrame::from_start_address(PhysAddr::new(usable.start)).unwrap();
+        let n = (usable.end - usable.start) / Size4KiB::SIZE;
+
+        self.frames = Some(first..(first + n));
+    }
+}
+
+unsafe impl FrameAllocator<Size4KiB> for SimpleFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+        self.frames.as_mut().and_then(|frames| {
+            let frame = frames.start + self.allocated;
+
+            if frames.contains(&frame) {
+                self.allocated += 1;
+                Some(frame)
+            } else {
+                None
+            }
+        })
+    }
+}

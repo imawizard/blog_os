@@ -11,6 +11,8 @@ use core::panic::PanicInfo;
 use kernel::task::{executor::Executor, keyboard, Task};
 use kernel::{logger, println};
 
+use bootloader_api::info::MemoryRegionKind;
+use core::ops::DerefMut;
 use kernel::acpi::{self, sdt, AcpiError};
 use kernel::nfit;
 
@@ -18,7 +20,7 @@ entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     use kernel::allocator;
-    use kernel::memory::{self, BootInfoFrameAllocator};
+    use kernel::memory;
     use x86_64::VirtAddr;
 
     logger::init(boot_info.framebuffer.as_mut().expect("no framebuffer"));
@@ -28,9 +30,21 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset.into_option().unwrap());
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
 
-    allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+    unsafe {
+        memory::FRAMES.lock().init(
+            boot_info
+                .memory_regions
+                .iter()
+                .filter(|r| r.kind == MemoryRegionKind::Usable)
+                .max_by(|a, b| (a.end - a.start).cmp(&(b.end - b.start)))
+                .copied()
+                .unwrap(),
+        );
+    }
+
+    allocator::init_heap(&mut mapper, memory::FRAMES.lock().deref_mut())
+        .expect("heap initialization failed");
 
     let acpi_tables = acpi::get_tables(
         boot_info.rsdp_addr.into_option().expect("no rsdp set"),
