@@ -1,6 +1,7 @@
 mod device;
 
 pub use device::*;
+pub mod ffi;
 pub mod table;
 
 use crate::nfit::Nfit;

@@ -59,9 +59,48 @@ macro_rules! println {
     ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
 }
 
+#[macro_export]
+macro_rules! eprintln {
+    ($($arg:tt)*) => ($crate::println!("ERROR: {}", format_args!($($arg)*)));
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     x86_64::instructions::interrupts::without_interrupts(|| {
         LOGGER.get().unwrap().0.lock().write_fmt(args).unwrap()
     });
+}
+
+mod ffi {
+    use core::ffi::{c_char, c_int, CStr};
+
+    #[no_mangle]
+    fn putchar(ch: c_int) -> c_int {
+        print!(
+            "{}",
+            ch.try_into()
+                .ok()
+                .and_then(char::from_u32)
+                .unwrap_or(char::REPLACEMENT_CHARACTER)
+        );
+        0
+    }
+
+    #[no_mangle]
+    fn puts(s: *const c_char) -> c_int {
+        match unsafe { CStr::from_ptr(s) }.to_str() {
+            Ok(s) => {
+                println!("{}", s);
+                0
+            }
+            Err(_) => -1,
+        }
+    }
+
+    #[no_mangle]
+    fn perror(s: *const c_char) {
+        if let Ok(s) = unsafe { CStr::from_ptr(s) }.to_str() {
+            eprintln!("{}", s);
+        }
+    }
 }
