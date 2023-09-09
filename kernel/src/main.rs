@@ -15,8 +15,16 @@ use bootloader_api::info::MemoryRegionKind;
 use core::ops::DerefMut;
 use kernel::acpi::{self, sdt, AcpiError};
 use kernel::nfit;
+use kernel::vmem::{self, MappedRegions, UsableRegions};
 
 entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
+
+macro_rules! p {
+    ($($arg:tt)*) => {{
+        kernel::serial_println!($($arg)*);
+        kernel::println!($($arg)*);
+    }}
+}
 
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     use kernel::allocator;
@@ -46,6 +54,56 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     allocator::init_heap(&mut mapper, memory::FRAMES.lock().deref_mut())
         .expect("heap initialization failed");
 
+    p!("===========================");
+    p!("Physical Memory Information");
+    p!("===========================");
+
+    p!("Phys memory regions passed by bootloader:");
+    for region in boot_info.memory_regions.iter() {
+        p!(
+            "0x{:012x}-0x{:012x} - {:?}-Region",
+            region.start,
+            region.end - 1,
+            region.kind,
+        );
+    }
+
+    p!("==========================");
+    p!("Virtual Memory Information");
+    p!("==========================");
+
+    p!("Page table regions being used:");
+    let mappings = vmem::get_mappings(&mut mapper);
+    let non_usable = mappings.into_regions();
+    non_usable.iter().for_each(|region| {
+        p!(
+            "0x{:012x}-0x{:012x} (size: 0x{:012x}, phys: 0x{:012x})",
+            region.virt.start,
+            region.virt.end - 1,
+            region.virt.end - region.virt.start - 1,
+            region.phys.start,
+        )
+    });
+
+    p!("Page table regions still unused:");
+    let usable = non_usable.into_usable();
+    usable.iter().for_each(|region| {
+        p!(
+            "0x{:012x}-0x{:012x} (size: 0x{:012x})",
+            region.start,
+            region.end - 1,
+            region.end - region.start - 1
+        )
+    });
+
+    let mut page_allocator = vmem::Manager::new(mapper, &memory::FRAMES, usable);
+    p!(
+        "PML4(CR3) is at 0x{:012x} (phys: 0x{:012x})",
+        page_allocator.virtual_address(),
+        page_allocator.physical_address(),
+    );
+    vmem::MANAGER.lock().set(page_allocator).unwrap();
+
     let acpi_tables = acpi::get_tables(
         boot_info.rsdp_addr.into_option().expect("no rsdp set"),
         phys_mem_offset,
@@ -60,7 +118,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     };
 
     for (i, e) in nfit.entries().enumerate() {
-        use kernel::println as p;
         use nfit::NfitEntry as E;
         match e {
             E::SpaRange(e) => p!("{}. NFIT Entry: {:#?}", i + 1, e),

@@ -19,6 +19,7 @@ pub mod memory;
 pub mod nfit;
 pub mod serial;
 pub mod task;
+pub mod vmem;
 
 pub fn init() {
     gdt::init();
