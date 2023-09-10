@@ -11,6 +11,7 @@ use core::panic::PanicInfo;
 use kernel::task::{executor::Executor, keyboard, Task};
 use kernel::{logger, println};
 
+mod corundum_test;
 use bootloader_api::info::MemoryRegionKind;
 use core::ops::DerefMut;
 use kernel::acpi::{self, sdt, AcpiError};
@@ -185,6 +186,8 @@ async fn pmem_stuff(rsdp: Option<u64>, phys_mem_offset: VirtAddr) {
     test_main();
 
     keyboard::getchar(&mut scancodes, &mut keyboard).await;
+
+    corundum_test::corundum_test();
 
     println!("Done.");
 }
