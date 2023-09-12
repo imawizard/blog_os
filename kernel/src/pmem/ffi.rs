@@ -15,13 +15,11 @@ struct File {
 
 #[no_mangle]
 extern "C" fn fopen(filename: *const c_char, mode: *const c_char) -> *mut c_void {
-    let filename = match unsafe { CStr::from_ptr(filename) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return ptr::null_mut(),
+    let Ok(filename) = unsafe { CStr::from_ptr(filename) }.to_str() else {
+        return ptr::null_mut();
     };
-    let mode = match unsafe { CStr::from_ptr(mode) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return ptr::null_mut(),
+    let Ok(mode) = unsafe { CStr::from_ptr(mode) }.to_str() else {
+        return ptr::null_mut();
     };
     let mut mgr = pmem::MANAGER.lock();
 
@@ -81,9 +79,8 @@ extern "C" fn fclose(file: *mut c_void) -> c_int {
 
 #[no_mangle]
 extern "C" fn remove(filename: *const c_char) -> c_int {
-    let filename = match unsafe { CStr::from_ptr(filename) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return -1,
+    let Ok(filename) = unsafe { CStr::from_ptr(filename) }.to_str() else {
+        return -1;
     };
 
     if pmem::MANAGER.lock().destroy_pool(filename) {
@@ -95,9 +92,8 @@ extern "C" fn remove(filename: *const c_char) -> c_int {
 
 #[no_mangle]
 extern "C" fn truncate(filename: *const c_char, length: c_ulonglong) -> c_ulonglong {
-    let filename = match unsafe { CStr::from_ptr(filename) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return 0,
+    let Ok(filename) = unsafe { CStr::from_ptr(filename) }.to_str() else {
+        return 0;
     };
 
     if let Some((addr, new_length)) = pmem::MANAGER.lock().resize_pool(filename, length) {
@@ -117,9 +113,8 @@ extern "C" fn truncate(filename: *const c_char, length: c_ulonglong) -> c_ulongl
 
 #[no_mangle]
 extern "C" fn size(filename: *const c_char) -> c_ulonglong {
-    let filename = match unsafe { CStr::from_ptr(filename) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return 0,
+    let Ok(filename) = unsafe { CStr::from_ptr(filename) }.to_str() else {
+        return 0;
     };
 
     let size = pmem::MANAGER
@@ -132,9 +127,8 @@ extern "C" fn size(filename: *const c_char) -> c_ulonglong {
 
 #[no_mangle]
 extern "C" fn map(filename: *const c_char) -> *mut c_void {
-    let filename = match unsafe { CStr::from_ptr(filename) }.to_str() {
-        Ok(filename) => filename,
-        Err(_) => return ptr::null_mut(),
+    let Ok(filename) = unsafe { CStr::from_ptr(filename) }.to_str() else {
+        return ptr::null_mut();
     };
 
     let r = pmem::MANAGER

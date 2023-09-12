@@ -109,9 +109,8 @@ impl Table {
     }
 
     pub fn deallocate(&mut self, index: usize) -> bool {
-        let entry = match self.inner.entries.get(index) {
-            Some(entry) => entry,
-            None => return false,
+        let Some(entry) = self.inner.entries.get(index) else {
+            return false;
         };
 
         let offset = entry.offset();
@@ -126,24 +125,21 @@ impl Table {
 
     pub fn reallocate(&mut self, index: usize, new_size: u64) -> bool {
         let needed_size = new_size.max(PageSize::SIZE);
-        let entry = match self.inner.entries.get(index) {
-            Some(entry) => entry,
-            None => return false,
+        let Some(entry) = self.inner.entries.get(index) else {
+            return false;
         };
         if entry.real_len() >= needed_size {
             return false;
         }
 
         let old_range = entry.offset..(entry.offset + entry.real_len());
-        let new_range = match self.reserve_range(needed_size, PageSize::SIZE) {
-            Some(range) => range,
-            None => return false,
+        let Some(new_range) = self.reserve_range(needed_size, PageSize::SIZE) else {
+            return false;
         };
         self.release_range(old_range.clone());
 
-        let entry = match self.inner.entries.get_mut(index) {
-            Some(entry) => entry,
-            None => return false,
+        let Some(entry) = self.inner.entries.get_mut(index) else {
+            return false;
         };
         entry.offset = new_range.start;
         entry.length = needed_size;

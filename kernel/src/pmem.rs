@@ -104,15 +104,14 @@ impl Manager {
     }
 
     pub fn destroy_pool(&mut self, name: &str) -> bool {
-        let (handle, entry) = match self.pmems.iter().find_map(|pmem| {
+        let Some((handle, entry)) = self.pmems.iter().find_map(|pmem| {
             pmem.pools
                 .entries()
                 .into_iter()
                 .find(|entry| entry.name() == name)
                 .map(|entry| (pmem.info.handle, entry))
-        }) {
-            Some((handle, entry)) => (handle, entry),
-            None => return false,
+        }) else {
+            return false;
         };
         let idx = entry.index();
         let old_offset = entry.offset();
