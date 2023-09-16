@@ -245,7 +245,7 @@ checksum = "e763eef8846b13b380f37dfecda401770b0ca4e56e95170237bd7c25c7db3582"
 [[package]]
 name = "corundum"
 version = "0.4.1"
-source = "git+https://github.com/imawizard/Corundum?branch=no_std#26e45b63a28b42e480e5677904b2591a1be6d04c"
+source = "git+https://github.com/imawizard/Corundum?branch=no_std#bff3219849ac97acb0f7aa9e1169b4b5e307054e"
 dependencies = [
  "impl-trait-for-tuples",
  "siphasher",

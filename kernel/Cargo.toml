@@ -30,7 +30,19 @@ log = "0.4.17"
 noto-sans-mono-bitmap = { version = "0.2.0", features = ["regular", "size_16", "unicode-basic-latin", "unicode-specials"], default-features = false }
 spinning_top = "0.2.4"
 acpi = "4.1.1"
-corundum = { features = ["no_std", "verbose"], default-features = false, git = "https://github.com/imawizard/Corundum", branch = "no_std" }
+
+[dependencies.corundum]
+default-features = false
+git = "https://github.com/imawizard/Corundum"
+branch = "no_std"
+features = [
+    "no_std",
+    "verbose",
+    #"no_persist",
+    #"use_clflushopt",
+    #"use_clwb",
+    #"use_ntstore",
+]
 
 [dependencies.lazy_static]
 version = "1.0"
