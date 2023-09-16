@@ -40,9 +40,9 @@ impl Table {
         let free_regions: BTreeMap<u64, u64>;
 
         trace!(
-            "Validate pmem table at 0x{:012x}-0x{:012x})",
+            "Validate pmem table at 0x{:012x} (size: {} MiB)",
             address,
-            address + device.size
+            device.size as f64 / 1024_f64 / 1024_f64,
         );
 
         if inner.is_valid() {
@@ -103,7 +103,15 @@ impl Table {
         }
 
         let r = self.reserve_range(needed_size, PageSize::SIZE)?;
-        self.inner.insert(name, r.start, size);
+        let index = self.inner.insert(name, r.start, size)?;
+
+        trace!(
+            "Added table entry #{} '{}' (0x{:x}-0x{:x})",
+            index,
+            name,
+            r.start,
+            r.end - 1,
+        );
 
         Some(r.start)
     }
@@ -115,8 +123,17 @@ impl Table {
 
         let offset = entry.offset();
         let len = entry.real_len();
+        let r = offset..(offset + len);
 
-        if self.release_range(offset..(offset + len)) {
+        trace!(
+            "Removing table entry #{} '{}' (0x{:x}-0x{:x})",
+            index,
+            entry.name(),
+            r.start,
+            r.end - 1,
+        );
+
+        if self.release_range(r) {
             self.inner.remove(index)
         } else {
             false
@@ -144,6 +161,16 @@ impl Table {
         entry.offset = new_range.start;
         entry.length = needed_size;
 
+        trace!(
+            "Moved region of #{} '{}' from 0x{:x}-0x{:x} to 0x{:x}-0x{:x}",
+            index,
+            entry.name(),
+            old_range.start,
+            old_range.end - 1,
+            new_range.start,
+            new_range.end - 1,
+        );
+
         ll::persist_obj(self, true);
 
         true
@@ -151,6 +178,14 @@ impl Table {
 
     pub fn entries(&self) -> impl IntoIterator<Item = IterEntry> {
         self.inner.entries()
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Entry> {
+        self.inner.entries.get(index)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut Entry> {
+        self.inner.entries.get_mut(index)
     }
 }
 

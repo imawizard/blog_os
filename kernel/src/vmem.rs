@@ -109,11 +109,7 @@ where
         S: PageSize + fmt::Debug,
         OffsetPageTable<'a>: Mapper<S>,
     {
-        if self.release_page_range(pages) {
-            true
-        } else {
-            false
-        }
+        self.release_page_range(pages)
     }
 
     fn release_page_range<S: PageSize>(&mut self, pages: PageRange<S>) -> bool
