@@ -7,14 +7,18 @@ pub mod table;
 use crate::nfit::Nfit;
 use crate::pmem::table::Table;
 use crate::vmem::{self};
+use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::{collections::BTreeMap, vec::Vec};
 use core::slice;
 use corundum::ll;
 use log::trace;
 use spin::Mutex;
-use x86_64::structures::paging::{page::PageRange, PageSize};
+use x86_64::structures::paging::{page::PageRange, Page, PageSize};
+use x86_64::VirtAddr;
 
 pub static MANAGER: Mutex<Manager> = Mutex::new(Manager::new());
+
+const USE_HEAP_INSTEAD_OF_PMEM: bool = false;
 
 pub struct Manager {
     pmems: Vec<ManagedPmem>,
@@ -92,6 +96,7 @@ impl Manager {
         };
         let index = entry.index();
         let offset = entry.offset();
+        let real_len = entry.real_len();
 
         if self
             .pmems
@@ -101,11 +106,25 @@ impl Manager {
             .unwrap_or(false)
         {
             if let Some((_, r)) = self.translated.get(&offset) {
-                if vmem::MANAGER
-                    .lock()
-                    .get_mut()
-                    .unwrap()
-                    .deallocate::<table::PageSize>(*r)
+                if !USE_HEAP_INSTEAD_OF_PMEM
+                    && vmem::MANAGER
+                        .lock()
+                        .get_mut()
+                        .unwrap()
+                        .deallocate::<table::PageSize>(*r)
+                    || USE_HEAP_INSTEAD_OF_PMEM && {
+                        unsafe {
+                            dealloc(
+                                r.start.start_address().as_u64() as *mut u8,
+                                Layout::from_size_align(
+                                    real_len as usize,
+                                    table::PageSize::SIZE as usize,
+                                )
+                                .unwrap(),
+                            )
+                        };
+                        true
+                    }
                 {
                     self.translated.remove(&offset);
                 }
@@ -167,11 +186,24 @@ impl Manager {
                 );
             }
 
-            vmem::MANAGER
-                .lock()
-                .get_mut()
-                .unwrap()
-                .deallocate::<table::PageSize>(old_pages);
+            if !USE_HEAP_INSTEAD_OF_PMEM {
+                vmem::MANAGER
+                    .lock()
+                    .get_mut()
+                    .unwrap()
+                    .deallocate::<table::PageSize>(old_pages);
+            } else {
+                unsafe {
+                    dealloc(
+                        old_pages.start.start_address().as_u64() as *mut u8,
+                        Layout::from_size_align(
+                            old_real_len as usize,
+                            table::PageSize::SIZE as usize,
+                        )
+                        .unwrap(),
+                    )
+                };
+            }
         }
 
         self.translated
@@ -191,26 +223,41 @@ impl Manager {
                         .contains_key(&entry.offset())
                         .then_some(())
                         .or_else(|| {
-                            vmem::MANAGER
-                                .lock()
-                                .get_mut()
-                                .unwrap()
-                                .allocate::<table::PageSize>(
-                                    pmem.info.phys_addr + entry.offset(),
-                                    entry.frames(),
-                                )
-                                .map(|r| {
-                                    self.translated
-                                        .entry(entry.offset())
-                                        .or_insert((pmem.info.handle, r));
-                                    trace!(
-                                        "Mapped pool '{}' to 0x{:012x}-0x{:012x}",
-                                        entry.name(),
-                                        r.start.start_address().as_u64(),
-                                        r.start.start_address().as_u64()
-                                            + (r.end - r.start) * table::PageSize::SIZE,
-                                    );
-                                })
+                            if !USE_HEAP_INSTEAD_OF_PMEM {
+                                vmem::MANAGER
+                                    .lock()
+                                    .get_mut()
+                                    .unwrap()
+                                    .allocate::<table::PageSize>(
+                                        pmem.info.phys_addr + entry.offset(),
+                                        entry.frames(),
+                                    )
+                            } else {
+                                let ptr = unsafe {
+                                    alloc(
+                                        Layout::from_size_align(
+                                            entry.real_len() as usize,
+                                            table::PageSize::SIZE as usize,
+                                        )
+                                        .unwrap(),
+                                    )
+                                };
+                                let first =
+                                    Page::from_start_address(VirtAddr::new(ptr as u64)).unwrap();
+                                Some(Page::range(first, first + entry.frames()))
+                            }
+                            .map(|r| {
+                                self.translated
+                                    .entry(entry.offset())
+                                    .or_insert((pmem.info.handle, r));
+                                trace!(
+                                    "Mapped pool '{}' to 0x{:012x}-0x{:012x}",
+                                    entry.name(),
+                                    r.start.start_address().as_u64(),
+                                    r.start.start_address().as_u64()
+                                        + (r.end - r.start) * table::PageSize::SIZE,
+                                );
+                            })
                         })
                         .map(|_| (pmem.info.handle, entry.index()))
                 })
