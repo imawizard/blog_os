@@ -2,6 +2,26 @@ use corundum::stm::{Chaperon, Journal};
 use corundum::{open_flags, MemPool, MemPoolTraits, PCell, Pbox, RootObj};
 use kernel::println;
 
+mod ffi {
+    use core::ffi::{c_char, CStr};
+    use core::ptr;
+
+    #[no_mangle]
+    extern "C" fn getenv(name: *const c_char) -> *const c_char {
+        let Ok(name) = unsafe { CStr::from_ptr(name) }.to_str() else {
+            return ptr::null();
+        };
+
+        (match name {
+            "CPUS" => "1\0".as_ptr(),
+            //"VERBOSE" => "1\0".as_ptr(),
+            //"RECOVERY_INFO" => "3\0".as_ptr(),
+            "VERIFY" => "2\0".as_ptr(),
+            _ => ptr::null(),
+        }) as *const c_char
+    }
+}
+
 corundum::pool!(pool1);
 corundum::pool!(pool2);
 
