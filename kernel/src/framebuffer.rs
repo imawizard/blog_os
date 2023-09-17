@@ -67,6 +67,9 @@ impl FrameBufferWriter {
     }
 
     fn newline(&mut self) {
+        if self.x_pos == BORDER_PADDING {
+            self.scroll();
+        }
         self.y_pos += HEIGHT_PER_LINE;
         self.carriage_return()
     }
