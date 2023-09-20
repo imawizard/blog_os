@@ -22,6 +22,7 @@ const USE_HEAP_INSTEAD_OF_PMEM: bool = false;
 
 pub struct Manager {
     pmems: Vec<ManagedPmem>,
+    // FIXME: Put handle into key not value, two pools on different dimms might have the same offset
     translated: BTreeMap<u64, (u32, PageRange<table::PageSize>)>,
 }
 
@@ -135,7 +136,7 @@ impl Manager {
         }
     }
 
-    pub fn resize_pool(&mut self, name: &str, new_size: u64) -> Option<(u64, u64)> {
+    pub fn resize_pool(&mut self, name: &str, new_size: u64) -> Option<(u64, u64, u64)> {
         let (handle, index) = self.ensure_pool_is_mapped_if_existent(name)?;
         let pmem = self.pmems.iter_mut().find(|p| p.info.handle == handle)?;
         let entry = pmem.pools.get(index)?;
@@ -212,7 +213,7 @@ impl Manager {
         self.translated
             .get(&new_offset.unwrap_or(old_offset))
             .map(|(_, r)| r.start.start_address().as_u64())
-            .map(|addr| (addr, old_len.max(new_size)))
+            .map(|addr| (addr, old_len.max(new_size), old_len))
     }
 
     fn ensure_pool_is_mapped_if_existent(&mut self, name: &str) -> Option<(u32, usize)> {

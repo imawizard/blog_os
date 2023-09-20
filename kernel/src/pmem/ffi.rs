@@ -96,9 +96,10 @@ extern "C" fn truncate(filename: *const c_char, length: c_ulonglong) -> c_ulongl
         return 0;
     };
 
-    if let Some((addr, new_length)) = pmem::MANAGER.lock().resize_pool(filename, length) {
+    if let Some((addr, new_length, old_length)) = pmem::MANAGER.lock().resize_pool(filename, length)
+    {
         let buf = unsafe { slice::from_raw_parts_mut(addr as *mut u8, new_length as usize) };
-        let extended = &mut buf[length as usize..];
+        let extended = &mut buf[old_length as usize..];
 
         if !extended.is_empty() {
             extended.fill(0);
