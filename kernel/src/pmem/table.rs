@@ -283,7 +283,7 @@ impl Entry {
     }
 
     pub fn real_len(&self) -> u64 {
-        x86_64::align_up(self.len(), PageSize::SIZE)
+        x86_64::align_up(self.len().max(1), PageSize::SIZE)
     }
 
     pub fn frames(&self) -> u64 {

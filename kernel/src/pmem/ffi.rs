@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use alloc::slice;
 use alloc::string::String;
 use core::ffi::{c_char, c_int, c_ulonglong, c_void, CStr};
+use core::mem::MaybeUninit;
 use core::ptr;
 use corundum::ll;
 
@@ -53,11 +54,11 @@ extern "C" fn fwrite(buf: *const c_void, size: usize, count: usize, file: *mut c
             .lock()
             .get_pool(&file.filename)
             .and_then(|(addr, size)| {
-                unsafe { slice::from_raw_parts_mut(addr as *mut u8, size as usize) }
+                unsafe { slice::from_raw_parts_mut(addr as *mut MaybeUninit<u8>, size as usize) }
                     .get_mut(file.pos as usize..)
                     .map(|s| {
                         let amt = buf_size.min(s.len());
-                        let buf = unsafe { slice::from_raw_parts_mut(buf as *mut u8, buf_size) };
+                        let buf = unsafe { slice::from_raw_parts_mut(buf as *mut _, buf_size) };
                         s[..amt].copy_from_slice(&buf[..amt]);
                         amt
                     })
@@ -98,11 +99,12 @@ extern "C" fn truncate(filename: *const c_char, length: c_ulonglong) -> c_ulongl
 
     if let Some((addr, new_length, old_length)) = pmem::MANAGER.lock().resize_pool(filename, length)
     {
-        let buf = unsafe { slice::from_raw_parts_mut(addr as *mut u8, new_length as usize) };
+        let buf: &mut [MaybeUninit<u8>] =
+            unsafe { slice::from_raw_parts_mut(addr as *mut _, new_length as usize) };
         let extended = &mut buf[old_length as usize..];
 
         if !extended.is_empty() {
-            extended.fill(0);
+            extended.fill(MaybeUninit::zeroed());
             ll::persist_obj(extended, true);
         }
 

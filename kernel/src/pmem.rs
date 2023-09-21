@@ -9,6 +9,7 @@ use crate::pmem::table::Table;
 use crate::vmem::{self};
 use alloc::alloc::{alloc, dealloc, Layout};
 use alloc::{collections::BTreeMap, vec::Vec};
+use core::mem::MaybeUninit;
 use core::slice;
 use corundum::ll;
 use log::trace;
@@ -68,7 +69,7 @@ impl Manager {
 
         self.pmems
             .iter_mut()
-            .find_map(|pmem| pmem.pools.allocate(name, size.max(1)))
+            .find_map(|pmem| pmem.pools.allocate(name, size))
             .map(|_| self.get_pool(name).unwrap())
     }
 
@@ -171,11 +172,11 @@ impl Manager {
 
             unsafe {
                 let from = slice::from_raw_parts(
-                    old_pages.start.start_address().as_ptr::<u8>(),
+                    old_pages.start.start_address().as_ptr::<MaybeUninit<u8>>(),
                     old_real_len as usize,
                 );
                 let to = slice::from_raw_parts_mut(
-                    new_pages.start.start_address().as_mut_ptr::<u8>(),
+                    new_pages.start.start_address().as_mut_ptr(),
                     old_real_len as usize,
                 );
 
