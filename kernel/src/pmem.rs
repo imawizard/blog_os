@@ -152,6 +152,8 @@ impl Manager {
             new_size,
         );
 
+        let mut new_offset = None;
+
         if old_real_len < new_size {
             if !pmem.pools.reallocate(index, new_size) {
                 return None;
@@ -164,6 +166,7 @@ impl Manager {
             let entry = pmem.pools.get(index)?;
 
             let (_, new_pages) = self.translated.get(&entry.offset())?;
+            new_offset = Some(entry.offset());
 
             unsafe {
                 let from = slice::from_raw_parts(
@@ -207,7 +210,7 @@ impl Manager {
         }
 
         self.translated
-            .get(&old_offset)
+            .get(&new_offset.unwrap_or(old_offset))
             .map(|(_, r)| r.start.start_address().as_u64())
             .map(|addr| (addr, old_len.max(new_size)))
     }
